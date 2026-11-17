@@ -24,3 +24,13 @@ Alles draait in de browser; gegevens staan alleen op je eigen toestel.
 - Maak af en toe een back-up via Instellingen > Gegevens.
 - Schema aanpassen: de trainingen staan bovenaan het script in `index.html` in de lijst `PLAN`.
 - Na een wijziging: verhoog `nachtloper-v1` in `sw.js` naar `v2`, zodat oude cache wordt opgeruimd.
+
+## Account en synchroniseren (v2)
+
+Je voortgang kan via je GitHub-account op telefoon en pc gelijk blijven.
+
+1. Maak een token: github.com/settings/tokens/new?scopes=gist (classic token, alleen het vinkje "gist", vervaldatum naar keuze).
+2. Open in de app Instellingen > Account, vul je naam en de token in en tik op Koppelen.
+3. Doe op je pc hetzelfde met dezelfde token.
+
+De gegevens staan in een geheime gist met de naam `nachtloper-data.json`. Die gist is niet openbaar vindbaar, maar wie de link heeft kan hem wel lezen.

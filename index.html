@@ -30,7 +30,9 @@ input,textarea,select{font:inherit;color:var(--text);background:var(--surface2);
 input:focus,textarea:focus,select:focus{outline:2px solid var(--lime);outline-offset:1px}
 h1,h2,h3,p{margin:0}
 
-#app{height:100%;display:flex;flex-direction:column}
+#app{height:100%;display:flex;flex-direction:column;max-width:560px;margin:0 auto}
+.syncdot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--grey);margin-left:6px;vertical-align:middle}
+.syncdot.ok{background:var(--lime)}.syncdot.err{background:var(--pink)}.syncdot.busy{background:var(--orange)}
 main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(var(--sat) + 18px) 18px 24px}
 .view{display:none}.view.on{display:block}
 
@@ -105,7 +107,7 @@ nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width
 nav button.on{color:var(--lime)}
 
 /* run scherm */
-#runv{position:fixed;inset:0;background:var(--bg);z-index:20;display:none;flex-direction:column;
+#runv{position:fixed;inset:0;max-width:560px;margin:0 auto;background:var(--bg);z-index:20;display:none;flex-direction:column;
   padding:calc(var(--sat) + 16px) 20px calc(var(--sab) + 20px)}
 #runv.on{display:flex}
 #runv .rtop{display:flex;justify-content:space-between;align-items:center}
@@ -258,12 +260,14 @@ const TIPS=[
 
 /* ---------- opslag ---------- */
 const KEY='nachtloper.v1';
-const DEF={done:{'1-1':{date:'2026-11-16',secs:622,km:1.75,feel:0,note:'Nachtloop'}},
+const DEF={name:'Teun',tomb:{},setUpd:0,sync:null,done:{'1-1':{date:'2026-11-17',secs:945,km:2.43,feel:0,note:'Ct5 6',upd:1}},
   settings:{voice:true,voiceName:'',rate:1,beeps:true,cues:true,warm:5,cool:5,start:'2026-11-16',race:'2027-02-06'},active:null};
 let S;try{S=JSON.parse(localStorage.getItem(KEY));}catch(e){}
 if(!S||!S.settings){S=JSON.parse(JSON.stringify(DEF));}
-S.settings=Object.assign({},DEF.settings,S.settings);S.done=S.done||{};
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+S.settings=Object.assign({},DEF.settings,S.settings);S.done=S.done||{};S.tomb=S.tomb||{};S.setUpd=S.setUpd||0;S.name=S.name||'Teun';if(S.sync===undefined)S.sync=null;
+function saveLocal(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+function save(){saveLocal();schedulePush();}
+function setS(k,v){S.settings[k]=v;S.setUpd=Date.now();save();}
 
 /* ---------- hulpjes ---------- */
 const $=s=>document.querySelector(s);
@@ -302,7 +306,7 @@ function estimate(){const l=Object.entries(S.done).filter(([,d])=>d.km>=2&&d.sec
 
 function renderHome(){
   const n=nextRun(),cw=curWeek(),days=Math.round((pd(S.settings.race)-today())/864e5);
-  let h='<div class="top"><div><div class="brand">Nachtloper</div><h1>Vandaag</h1></div><div class="chip">'+
+  let h='<div class="top"><div><div class="brand">Nachtloper · '+esc(S.name)+'<span class="syncdot '+syncCls()+'"></span></div><h1>Vandaag</h1></div><div class="chip">'+
     (days>0?'<b>'+days+'</b> dagen tot de start':days===0?'<b>Wedstrijddag</b>':'Wedstrijd geweest')+'</div></div>';
   if(n){const segs=segsFor(n),kinds=[...new Set(segs.map(x=>x.k))];
     h+='<div class="card hero"><div class="wk">WEEK '+n.w+' · RUN '+n.n+(n.n===3&&!n.race?' · LANGE DUURLOOP':'')+'</div>'+
@@ -367,25 +371,25 @@ function renderStats(){
 function nlVoices(){try{return speechSynthesis.getVoices().filter(v=>/^nl/i.test(v.lang));}catch(e){return [];}}
 function renderSet(){
   const st=S.settings,vs=nlVoices();
-  const sw=(k)=>'<button class="sw'+(st[k]?' on':'')+'" onclick="S.settings.'+k+'=!S.settings.'+k+';save();renderSet()"></button>';
-  $('#v-set').innerHTML='<div class="top"><div><div class="brand">Afstellen</div><h1>Instellingen</h1></div></div>'+
+  const sw=(k)=>'<button class="sw'+(st[k]?' on':'')+'" onclick="setS(\''+k+'\',!S.settings.'+k+');renderSet()"></button>';
+  $('#v-set').innerHTML='<div class="top"><div><div class="brand">Afstellen</div><h1>Instellingen</h1></div></div>'+accountCard()+
    '<div class="card"><h3>Stem en geluid</h3>'+
    '<div class="row"><label>Stem<small>Kondigt elk blok aan</small></label>'+sw('voice')+'</div>'+
    '<div class="row"><label>Tussentijdse meldingen<small>Halverwege, nog 1 minuut, elke 5 min</small></label>'+sw('cues')+'</div>'+
    '<div class="row"><label>Piepjes<small>Aftellen 3, 2, 1 bij een wissel</small></label>'+sw('beeps')+'</div>'+
-   '<div class="row"><label>Stemkeuze</label><select onchange="S.settings.voiceName=this.value;save()">'+
+   '<div class="row"><label>Stemkeuze</label><select onchange="setS(\'voiceName\',this.value)">'+
      '<option value="">Standaard Nederlands</option>'+vs.map(v=>'<option'+(v.name===st.voiceName?' selected':'')+'>'+esc(v.name)+'</option>').join('')+'</select></div>'+
-   '<div class="row"><label>Spreeksnelheid</label><input type="range" min="0.8" max="1.3" step="0.05" value="'+st.rate+'" onchange="S.settings.rate=+this.value;save()"></div>'+
+   '<div class="row"><label>Spreeksnelheid</label><input type="range" min="0.8" max="1.3" step="0.05" value="'+st.rate+'" onchange="setS(\'rate\',+this.value)"></div>'+
    '<button class="btn ghost small" onclick="unlockAudio();speak(\'Rennen. 4 minuten. Rustig tempo.\',true);beep(880,.15)">Test stem en piep</button></div>'+
    '<div class="card"><h3>Training</h3>'+
-   '<div class="row"><label>Warming-up<small>Minuten wandelen vooraf</small></label><input type="number" min="0" max="15" value="'+st.warm+'" onchange="S.settings.warm=Math.max(0,+this.value||0);save();renderAll()"></div>'+
-   '<div class="row"><label>Cooling-down<small>Minuten wandelen na afloop</small></label><input type="number" min="0" max="15" value="'+st.cool+'" onchange="S.settings.cool=Math.max(0,+this.value||0);save();renderAll()"></div>'+
-   '<div class="row"><label>Start schema<small>Maandag van week 1</small></label><input type="date" value="'+st.start+'" onchange="if(this.value){S.settings.start=this.value;save();renderAll()}"></div>'+
-   '<div class="row"><label>Wedstrijddatum</label><input type="date" value="'+st.race+'" onchange="if(this.value){S.settings.race=this.value;save();renderAll()}"></div></div>'+
+   '<div class="row"><label>Warming-up<small>Minuten wandelen vooraf</small></label><input type="number" min="0" max="15" value="'+st.warm+'" onchange="setS(\'warm\',Math.max(0,+this.value||0));renderAll()"></div>'+
+   '<div class="row"><label>Cooling-down<small>Minuten wandelen na afloop</small></label><input type="number" min="0" max="15" value="'+st.cool+'" onchange="setS(\'cool\',Math.max(0,+this.value||0));renderAll()"></div>'+
+   '<div class="row"><label>Start schema<small>Maandag van week 1</small></label><input type="date" value="'+st.start+'" onchange="if(this.value){setS(\'start\',this.value);renderAll()}"></div>'+
+   '<div class="row"><label>Wedstrijddatum</label><input type="date" value="'+st.race+'" onchange="if(this.value){setS(\'race\',this.value);renderAll()}"></div></div>'+
    '<div class="card"><h3>Gegevens</h3><p class="sub">Alles staat alleen op dit toestel. Maak af en toe een back-up: iOS kan opslag van webapps wissen.</p>'+
    '<button class="btn ghost small" onclick="backup()">Back-up maken of terugzetten</button>'+
    '<button class="btn danger small" onclick="askReset()">Alles wissen</button></div>'+
-   '<p class="sub" style="text-align:center;margin:8px 0 20px">Nachtloper v1 · gemaakt voor de Nacht van Groningen</p>';
+   '<p class="sub" style="text-align:center;margin:8px 0 20px">Nachtloper v2 · gemaakt voor de Nacht van Groningen</p>';
 }
 
 /* ---------- sheet ---------- */
@@ -400,7 +404,7 @@ function openRun(id){
   segs.forEach(x=>{h+='<div class="seg"><i style="background:'+KIND[x.k].c+'"></i><span>'+KIND[x.k].n+'</span><em>'+(x.s?mmss(x.s):'open')+'</em></div>';});
   h+='</div><button class="btn" onclick="closeSheet();startRun(\''+id+'\')">Start deze training</button>';
   if(d)h+='<button class="btn ghost small" onclick="logSheet(\''+id+'\')">Log aanpassen</button>'+
-          '<button class="btn danger small" onclick="delete S.done[\''+id+'\'];save();closeSheet();renderAll()">Markeer als niet gedaan</button>';
+          '<button class="btn danger small" onclick="unmark(\''+id+'\')">Markeer als niet gedaan</button>';
   else h+='<button class="btn ghost small" onclick="logSheet(\''+id+'\')">Markeer als gedaan</button>';
   sheet(h);
 }
@@ -423,7 +427,7 @@ function setFeel(n){logFeel=n;document.querySelectorAll('#l-feel button').forEac
 function saveLog(id){
   const old=S.done[id]||{};
   const km=parseFloat(String($('#l-km').value).replace(',','.'))||0;
-  S.done[id]={date:old.date||iso(new Date()),km:km,secs:parseT($('#l-t').value),feel:logFeel,note:$('#l-n').value.trim()};
+  S.done[id]={date:old.date||iso(new Date()),km:km,secs:parseT($('#l-t').value),feel:logFeel,note:$('#l-n').value.trim(),upd:Date.now()};delete S.tomb[id];
   save();closeSheet();renderAll();
 }
 function backup(){
@@ -433,7 +437,7 @@ function backup(){
    '<button class="btn ghost small" onclick="restore()">Terugzetten</button>');
 }
 function restore(){try{const o=JSON.parse($('#b-t').value);if(!o||typeof o.done!=='object')throw 0;
-  S.done=o.done;S.settings=Object.assign({},DEF.settings,o.settings||{});save();closeSheet();renderAll();}
+  const now=Date.now();S.done=o.done;Object.values(S.done).forEach(d=>{d.upd=now;});S.settings=Object.assign({},DEF.settings,o.settings||{});S.setUpd=now;save();closeSheet();renderAll();}
   catch(e){$('#b-t').style.outline='2px solid var(--pink)';}}
 function askReset(){sheet('<h2>Alles wissen?</h2><p class="sub">Je logboek en instellingen verdwijnen van dit toestel. Dit kan niet ongedaan worden gemaakt.</p>'+
   '<button class="btn danger" onclick="localStorage.removeItem(KEY);location.reload()">Ja, alles wissen</button><button class="btn ghost small" onclick="closeSheet()">Annuleren</button>');}
@@ -458,7 +462,7 @@ $('#r-ring').style.strokeDasharray=CIRC;$('#r-tot').style.strokeDasharray=CIRCT;
 
 async function wakeOn(){try{if('wakeLock' in navigator){wake=await navigator.wakeLock.request('screen');$('#r-hint').textContent='Scherm blijft aan tijdens je training.';}}catch(e){}}
 function wakeOff(){try{if(wake)wake.release();}catch(e){}wake=null;}
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&A){wakeOn();tick();}});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(A){wakeOn();tick();}sync();}});
 
 function startRun(id,resume){
   RUN=byId(id);if(!RUN)return;SEGS=segsFor(RUN);TOTAL=sum(SEGS);
@@ -516,7 +520,7 @@ function tick(){
 function setPP(){$('#r-pp').innerHTML=A&&A.pausedAt?'<path d="M7 4v16l13-8z"/>':'<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>';}
 function setVI(){$('#r-vi').innerHTML=S.settings.voice?'<path d="M4 9v6h4l5 4V5L8 9zM16 8a5 5 0 0 1 0 8v-2a3 3 0 0 0 0-4z"/>':
   '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9l5 6M21 9l-5 6" stroke="#eef2f8" stroke-width="2" stroke-linecap="round"/>';}
-function toggleVoice(){S.settings.voice=!S.settings.voice;save();setVI();if(S.settings.voice)speak('Stem aan.',true);else try{speechSynthesis.cancel();}catch(e){}}
+function toggleVoice(){setS('voice',!S.settings.voice);setVI();if(S.settings.voice)speak('Stem aan.',true);else try{speechSynthesis.cancel();}catch(e){}}
 function togglePause(){if(!A)return;unlockAudio();
   if(A.pausedAt){A.paused+=Date.now()-A.pausedAt;A.pausedAt=null;speak('Verder.',true);}
   else{A.pausedAt=Date.now();speak('Pauze.',true);}
@@ -540,10 +544,92 @@ function askStop(){if(!A)return;const was=A.pausedAt;if(!was){A.pausedAt=Date.no
 function resumeFromStop(){closeSheet();if(A&&A.pausedAt){A.paused+=Date.now()-A.pausedAt;A.pausedAt=null;save();setPP();tick();}}
 function finishNow(){const id=RUN.id,secs=mainDone();if(RUN.race)speak('Gefinisht. Gefeliciteerd.',true);stopEngine();renderAll();logSheet(id,secs,true);}
 
+
+/* ---------- account en synchronisatie via een GitHub-gist ---------- */
+const GH='https://api.github.com',GFILE='nachtloper-data.json';
+let syncing=false,syncAgain=false,syncMsg='',syncErr=false,pushT=null,lastPayload=null;
+function payload(){return {v:2,name:S.name,done:S.done,tomb:S.tomb,settings:S.settings,setUpd:S.setUpd};}
+function syncCls(){if(!S.sync||!S.sync.token)return '';if(syncing)return 'busy';return syncErr?'err':(S.sync.last?'ok':'');}
+function setSync(m,err){syncMsg=m;syncErr=!!err;const d=document.querySelectorAll('.syncdot');d.forEach(e=>e.className='syncdot '+syncCls());
+  const s=$('#syncmsg');if(s)s.textContent=m;}
+async function gh(path,opt){opt=opt||{};const hd={'Authorization':'Bearer '+S.sync.token,'Accept':'application/vnd.github+json'};
+  if(opt.body)hd['Content-Type']='application/json';
+  const r=await fetch(GH+path,{method:opt.method||'GET',headers:hd,body:opt.body,cache:'no-store'});
+  if(!r.ok){const e=new Error('HTTP '+r.status);e.status=r.status;throw e;}return r.status===204?null:r.json();}
+function mergeRemote(rem){
+  if(!rem||typeof rem!=='object')return;
+  const rd=rem.done||{},rt=rem.tomb||{};
+  const ids=new Set([...Object.keys(S.done),...Object.keys(rd),...Object.keys(S.tomb),...Object.keys(rt)]);
+  ids.forEach(id=>{
+    let best={t:-1,v:undefined};
+    const c=[[S.done[id],S.done[id]&&(S.done[id].upd||0)],[rd[id],rd[id]&&(rd[id].upd||0)],[null,S.tomb[id]],[null,rt[id]]];
+    c.forEach(([v,t])=>{if(t===undefined||t===null||(v===undefined))return;if(t>best.t)best={t:t,v:v};});
+    if(best.v)S.done[id]=best.v;else if(best.v===null)delete S.done[id];
+    const tm=Math.max(S.tomb[id]||0,rt[id]||0);if(tm)S.tomb[id]=tm;
+  });
+  if((rem.setUpd||0)>S.setUpd){S.settings=Object.assign({},DEF.settings,rem.settings||{});S.name=rem.name||S.name;S.setUpd=rem.setUpd;}
+}
+async function findGist(){
+  for(let pg=1;pg<=5;pg++){const l=await gh('/gists?per_page=100&page='+pg);
+    const g=l.find(x=>x.files&&x.files[GFILE]);if(g)return g.id;if(l.length<100)break;}
+  const n=await gh('/gists',{method:'POST',body:JSON.stringify({description:'Nachtloper: hardloopvoortgang van '+S.name,public:false,
+    files:{[GFILE]:{content:JSON.stringify(payload())}}})});
+  return n.id;
+}
+async function sync(){
+  if(!S.sync||!S.sync.token)return;
+  if(syncing){syncAgain=true;return;}
+  syncing=true;setSync('Bezig met synchroniseren');
+  try{
+    if(!S.sync.gistId){S.sync.gistId=await findGist();saveLocal();}
+    const g=await gh('/gists/'+S.sync.gistId);const f=g.files&&g.files[GFILE];let rem=null;
+    if(f){let t=f.content;if(f.truncated)t=await (await fetch(f.raw_url,{cache:'no-store'})).text();try{rem=JSON.parse(t);}catch(e){}}
+    const before=JSON.stringify(payload());mergeRemote(rem);const after=JSON.stringify(payload());
+    if(before!==after){saveLocal();if(!document.querySelector('#shade.on'))renderAll();}
+    if(!rem||JSON.stringify(rem)!==after)await gh('/gists/'+S.sync.gistId,{method:'PATCH',body:JSON.stringify({files:{[GFILE]:{content:after}}})});
+    lastPayload=after;S.sync.last=Date.now();saveLocal();
+    syncing=false;setSync('Gesynchroniseerd om '+new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}));
+  }catch(e){
+    syncing=false;
+    if(e.status===404){S.sync.gistId=null;saveLocal();setSync('Opslagbestand niet gevonden, probeer opnieuw',true);}
+    else if(e.status===401)setSync('Token ongeldig of verlopen. Koppel opnieuw.',true);
+    else setSync('Geen verbinding. Wordt later bijgewerkt.',true);
+  }
+  if(syncAgain){syncAgain=false;sync();}
+}
+function schedulePush(){if(!S.sync||!S.sync.token)return;const p=JSON.stringify(payload());if(p===lastPayload)return;
+  clearTimeout(pushT);pushT=setTimeout(sync,2500);}
+function accountCard(){
+  const on=S.sync&&S.sync.token;
+  if(on)return '<div class="card"><h3>Account</h3>'+
+    '<div class="row"><label>'+esc(S.name)+'<small>Gekoppeld aan GitHub'+(S.sync.login?' ('+esc(S.sync.login)+')':'')+'</small></label><span class="syncdot '+syncCls()+'"></span></div>'+
+    '<p class="sub" id="syncmsg">'+esc(syncMsg||'Je voortgang wordt automatisch bijgewerkt.')+'</p>'+
+    '<button class="btn ghost small" onclick="sync()">Nu synchroniseren</button>'+
+    '<button class="btn danger small" onclick="disconnect()">Ontkoppelen op dit toestel</button></div>';
+  return '<div class="card"><h3>Account</h3><p class="sub">Koppel je GitHub-account om je voortgang op je telefoon en pc gelijk te houden. Gebruik op elk toestel dezelfde token.</p>'+
+    '<div class="field"><label>Naam</label><input id="a-name" value="'+esc(S.name)+'"></div>'+
+    '<div class="field"><label>GitHub-token (alleen recht "gist")</label><input id="a-tok" type="password" autocomplete="off" placeholder="ghp_..."></div>'+
+    '<p class="sub" id="syncmsg" style="color:var(--pink)">'+(syncErr?esc(syncMsg):'')+'</p>'+
+    '<button class="btn small" onclick="connect()">Koppelen</button>'+
+    '<a class="btn ghost small" style="text-decoration:none" target="_blank" rel="noopener" href="https://github.com/settings/tokens/new?scopes=gist&description=Nachtloper">Token aanmaken op GitHub</a></div>';
+}
+async function connect(){
+  const tok=$('#a-tok').value.trim(),nm=$('#a-name').value.trim()||'Teun';
+  if(!tok){setSync('Vul eerst een token in.',true);return;}
+  S.sync={token:tok};setSync('Controleren');
+  try{const u=await gh('/user');S.sync.login=u.login;}
+  catch(e){S.sync=null;saveLocal();setSync(e.status===401?'Deze token werkt niet.':'Geen verbinding met GitHub.',true);renderSet();return;}
+  if(nm!==S.name){S.name=nm;S.setUpd=Date.now();}
+  saveLocal();renderSet();await sync();renderAll();
+}
+function disconnect(){S.sync=null;syncMsg='';syncErr=false;saveLocal();renderAll();}
+function unmark(id){delete S.done[id];S.tomb[id]=Date.now();save();closeSheet();renderAll();}
+
 /* ---------- start ---------- */
 renderAll();
 if(S.active&&byId(S.active.id)&&Date.now()-S.active.start<5*3600*1000){A=S.active;startRun(A.id,true);}
 else if(S.active){S.active=null;save();}
+sync();
 if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.serviceWorker.register('sw.js').catch(()=>{});}
 </script>
 </body>

@@ -255,7 +255,7 @@ nav button.on{color:var(--lime)}
 
 <script>
 'use strict';
-const APP_VERSION='8';
+const APP_VERSION='9';
 /* ---------- schema ---------- */
 const R=m=>({k:'run',s:Math.round(m*60)}), W=m=>({k:'walk',s:Math.round(m*60)}),
       T=m=>({k:'tempo',s:Math.round(m*60)}), SP=s=>({k:'sprint',s:s});
@@ -769,14 +769,18 @@ function initMap(){
   setDraw(drawMode);rtSnapBtn();
 }
 /* kaart schuift mee als je vinger bij de rand komt */
-function edgeVec(ev){const r=$('#map').getBoundingClientRect(),m=56,c=v=>Math.max(-m,Math.min(m,v));let dx=0,dy=0;
+const EDGE=95,PAN_MAX=3.5; // randzone in px, maximale snelheid in px per frame (ca. 210 px per seconde)
+function edgeVec(ev){const r=$('#map').getBoundingClientRect(),m=EDGE,c=v=>Math.max(-m,Math.min(m,v));let dx=0,dy=0;
   if(ev.clientX<r.left+m)dx=c(ev.clientX-(r.left+m));else if(ev.clientX>r.right-m)dx=c(ev.clientX-(r.right-m));
   if(ev.clientY<r.top+m)dy=c(ev.clientY-(r.top+m));else if(ev.clientY>r.bottom-m)dy=c(ev.clientY-(r.bottom-m));
   return [dx,dy];}
 function panLoop(){
   if(!drawing||!lastEv){panRAF=null;return;}
   const v=edgeVec(lastEv);
-  if(v[0]||v[1]){MAP.panBy([v[0]*0.14,v[1]*0.14],{animate:false});addPt(lastEv,false);}
+  if(v[0]||v[1]){
+    // zacht beginnen: hoe dieper in de randzone, hoe sneller, met een vast maximum
+    const sp=c=>Math.sign(c)*PAN_MAX*Math.pow(Math.abs(c)/EDGE,2);
+    MAP.panBy([sp(v[0]),sp(v[1])],{animate:false});addPt(lastEv,false);}
   panRAF=requestAnimationFrame(panLoop);
 }
 function addPt(ev,force){

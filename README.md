@@ -23,7 +23,7 @@ Alles draait in de browser; gegevens staan alleen op je eigen toestel.
 - De timer rekent met de klok, dus als je even naar Strava wisselt loopt hij daarna gewoon goed verder.
 - Maak af en toe een back-up via Instellingen > Gegevens.
 - Schema aanpassen: de trainingen staan bovenaan het script in `index.html` in de lijst `PLAN`.
-- Na een wijziging: verhoog `nachtloper-v1` in `sw.js` naar `v2`, zodat oude cache wordt opgeruimd.
+- Na een wijziging: verhoog het nummer op drie plekken tegelijk: `APP_VERSION` in `index.html`, `version.json` en `nachtloper-vX` in `sw.js`. De app ziet dan bij openen dat er een nieuwe versie is en herlaadt zichzelf (niet tijdens een training).
 
 ## Account en synchroniseren (v2)
 

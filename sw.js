@@ -1,5 +1,5 @@
 // Nachtloper service worker: eerst netwerk (zodat updates van GitHub doorkomen), anders cache (offline).
-const CACHE = 'nachtloper-v3';
+const CACHE = 'nachtloper-v4';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -12,7 +12,7 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
   e.respondWith(
-    fetch(req).then(res => {
+    fetch(req,{cache:'no-store'}).then(res => {
       const copy = res.clone();
       caches.open(CACHE).then(c => c.put(req, copy));
       return res;

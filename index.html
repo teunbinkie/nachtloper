@@ -205,6 +205,7 @@ nav button.on{color:var(--lime)}
 
 <script>
 'use strict';
+const APP_VERSION='4';
 /* ---------- schema ---------- */
 const R=m=>({k:'run',s:Math.round(m*60)}), W=m=>({k:'walk',s:Math.round(m*60)}),
       T=m=>({k:'tempo',s:Math.round(m*60)}), SP=s=>({k:'sprint',s:s});
@@ -632,7 +633,19 @@ renderAll();
 if(S.active&&byId(S.active.id)&&Date.now()-S.active.start<5*3600*1000){A=S.active;startRun(A.id,true);}
 else if(S.active){S.active=null;save();}
 sync();
-if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.serviceWorker.register('sw.js').catch(()=>{});}
+/* automatisch bijwerken: nieuwe versie op GitHub = herladen, maar nooit tijdens een training of open venster */
+async function checkUpdate(){
+  if(location.protocol!=='https:')return;
+  try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;
+    const v=(await r.json()).v;
+    if(v&&String(v)!==APP_VERSION&&!A&&!document.querySelector('#shade.on')){
+      try{const rg=await navigator.serviceWorker.getRegistration();if(rg)await rg.update();}catch(e){}
+      location.reload();}
+  }catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate();});
+if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.serviceWorker.register('sw.js').then(r=>r.update()).catch(()=>{});}
+checkUpdate();
 </script>
 </body>
 </html>

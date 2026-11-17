@@ -32,7 +32,7 @@ input,textarea,select{font:inherit;color:var(--text);background:var(--surface2);
 input:focus,textarea:focus,select:focus{outline:2px solid var(--lime);outline-offset:1px}
 h1,h2,h3,p{margin:0}
 
-#app{position:fixed;top:0;left:0;right:0;bottom:0;height:var(--app-h,auto);display:flex;flex-direction:column;max-width:560px;margin:0 auto}
+#app{position:fixed;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;max-width:560px;margin:0 auto}
 .syncdot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--grey);margin-left:6px;vertical-align:middle}
 .syncdot.ok{background:var(--lime)}.syncdot.err{background:var(--pink)}.syncdot.busy{background:var(--orange)}
 main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(var(--sat) + 18px) 18px 24px}
@@ -109,7 +109,7 @@ nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width
 nav button.on{color:var(--lime)}
 
 /* run scherm */
-#runv{position:fixed;inset:0;height:var(--app-h,auto);max-width:560px;margin:0 auto;background:var(--bg);z-index:20;display:none;flex-direction:column;
+#runv{position:fixed;inset:0;max-width:560px;margin:0 auto;background:var(--bg);z-index:20;display:none;flex-direction:column;
   padding:calc(var(--sat) + 16px) 20px calc(var(--sab) + 20px)}
 #runv.on{display:flex}
 #runv .rtop{display:flex;justify-content:space-between;align-items:center}
@@ -170,7 +170,7 @@ nav button.on{color:var(--lime)}
 .lockhint{text-align:center;font-size:12px;color:var(--mute);margin-top:14px}
 
 /* sheet */
-#shade{position:fixed;inset:0;height:var(--app-h,auto);background:rgba(0,0,0,.6);z-index:30;display:none;align-items:flex-end}
+#shade{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:30;display:none;align-items:flex-end}
 #shade.on{display:flex}
 #sheet{background:var(--surface);border-radius:26px 26px 0 0;border:1px solid var(--line);border-bottom:0;
   width:100%;max-height:88vh;overflow-y:auto;padding:22px 20px calc(var(--sab) + 22px)}
@@ -255,15 +255,21 @@ nav button.on{color:var(--lime)}
 
 <script>
 'use strict';
-const APP_VERSION='10';
-/* iOS geeft een app op het beginscherm soms een te korte schermhoogte door: neem dan de echte schermhoogte */
-function fitScreen(){
-  const sa=navigator.standalone||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
-  const portrait=window.innerHeight>=window.innerWidth;
-  const H=sa&&portrait?Math.max(window.innerHeight,screen.height):window.innerHeight;
-  document.documentElement.style.setProperty('--app-h',H+'px');
+const APP_VERSION='11';
+/* iOS-bug: na het typen (toetsenbord open en dicht) blijft een app op het beginscherm te kort,
+   met een zwarte balk onderin. Opnieuw laten meten zodra het toetsenbord dicht is. */
+let maxVH=window.innerHeight;
+function healViewport(){
+  maxVH=Math.max(maxVH,window.innerHeight);
+  if(maxVH-window.innerHeight<=4)return;
+  const app=document.getElementById('app'),m=document.querySelector('main'),top=m?m.scrollTop:0;
+  app.style.display='none';void app.offsetHeight;app.style.display='';
+  if(m)m.scrollTop=top;
+  setTimeout(()=>{maxVH=Math.max(maxVH,window.innerHeight);},50);
 }
-fitScreen();window.addEventListener('resize',fitScreen);window.addEventListener('orientationchange',()=>setTimeout(fitScreen,300));
+window.addEventListener('resize',()=>{maxVH=Math.max(maxVH,window.innerHeight);});
+document.addEventListener('focusout',e=>{if(e.target&&/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)){setTimeout(healViewport,140);setTimeout(healViewport,600);}});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(healViewport,200);});
 /* ---------- schema ---------- */
 const R=m=>({k:'run',s:Math.round(m*60)}), W=m=>({k:'walk',s:Math.round(m*60)}),
       T=m=>({k:'tempo',s:Math.round(m*60)}), SP=s=>({k:'sprint',s:s});

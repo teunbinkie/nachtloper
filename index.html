@@ -255,7 +255,7 @@ nav button.on{color:var(--lime)}
 
 <script>
 'use strict';
-const APP_VERSION='11';
+const APP_VERSION='12';
 /* iOS-bug: na het typen (toetsenbord open en dicht) blijft een app op het beginscherm te kort,
    met een zwarte balk onderin. Opnieuw laten meten zodra het toetsenbord dicht is. */
 let maxVH=window.innerHeight;
@@ -289,12 +289,15 @@ const PLAN=[
    {t:'25 min aan een stuk',main:[R(25)]}]},
  {runs:[{t:'20 min rustig',main:[R(20)]},{t:'22 min rustig',main:[R(22)]},{t:'30 min rustig (ca. 4 km)',main:[R(30)]}]},
  {note:'Eerste 5 km aan een stuk',runs:[{t:'25 min rustig',main:[R(25)]},{t:'25 min rustig',main:[R(25)]},{t:'35 min rustig (ca. 5 km)',main:[R(35)]}]},
- {runs:[{t:'25 min rustig',main:[R(25)]},{t:'30 min rustig',main:[R(30)]},{t:'40 min rustig (ca. 5,5 km)',main:[R(40)]}]},
+ {note:'Testloop 3 km in run 2: stuur de tijd naar Claude',runs:[{t:'25 min rustig',main:[R(25)]},
+   {t:'Testloop: 3 km zo snel als je volhoudt',test:3,main:[R(10),{k:'open',s:0,txt:'Testloop. Loop 3 kilometer zo snel als je het kunt volhouden. Begin niet te hard. Tik op stop bij de finish.'}]},
+   {t:'40 min rustig (ca. 5,5 km)',main:[R(40)]}]},
  {runs:[{t:'30 min rustig',main:[R(30)]},
    {t:'30 min met 4x 1 min versnellen',main:[R(10),...rep(4,SP(60),R(2),true),R(8)]},
    {t:'45 min rustig (ca. 6,5 km)',main:[R(45)]}]},
  {note:'Herstelweek: bewust minder',runs:[{t:'25 min rustig',main:[R(25)]},{t:'25 min rustig',main:[R(25)]},{t:'40 min rustig',main:[R(40)]}]},
- {note:'Wedstrijdtempo: rond 6:45 tot 7:00 per km',runs:[{t:'30 min rustig',main:[R(30)]},
+ {note:'5 km onder ca. 28:30: mik op 5:55 per km in de wedstrijd, anders 6:30 tot 6:45',runs:[
+   {t:'Testloop: 5 km zo snel als je volhoudt',test:5,main:[R(10),{k:'open',s:0,txt:'Testloop. Loop 5 kilometer zo snel als je het kunt volhouden. De eerste kilometer rustig. Tik op stop bij de finish.'}]},
    {t:'35 min met 3x 4 min wedstrijdtempo',main:[R(10),...rep(3,T(4),R(3),true),R(4)]},
    {t:'55 min rustig (ca. 7,5 km)',main:[R(55)]}]},
  {note:'Langste run van het schema',runs:[{t:'30 min rustig',main:[R(30)]},
@@ -358,7 +361,7 @@ const nextRun=()=>ALL.find(r=>!S.done[r.id]);
 function curWeek(){const d=Math.floor((today()-pd(S.settings.start))/864e5);return Math.min(12,Math.max(1,Math.floor(d/7)+1));}
 function weekStart(w){const d=pd(S.settings.start);d.setDate(d.getDate()+(w-1)*7);return d;}
 function stripHTML(segs){return segs.map(x=>'<i style="flex:'+(x.s||600)+' 1 0;background:'+KIND[x.k].c+'"></i>').join('');}
-function durLabel(r){return r.race?'10 km':Math.round(sum(segsFor(r))/60)+' min';}
+function durLabel(r){return r.race?'10 km':r.test?r.test+' km test':Math.round(sum(segsFor(r))/60)+' min';}
 
 /* ---------- navigatie + render ---------- */
 function go(v){document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));
@@ -376,7 +379,7 @@ function renderHome(){
     (days>0?'<b>'+days+'</b> dagen tot de start':days===0?'<b>Wedstrijddag</b>':'Wedstrijd geweest')+'</div></div>';
   if(n){const segs=segsFor(n),kinds=[...new Set(segs.map(x=>x.k))];
     h+='<div class="card hero"><div class="wk">WEEK '+n.w+' · RUN '+n.n+(n.n===3&&!n.race?' · LANGE DUURLOOP':'')+'</div>'+
-      '<div class="ttl">'+esc(n.t)+'</div><div class="meta">'+(n.race?'Stopwatch met stem, jij bepaalt het einde':
+      '<div class="ttl">'+esc(n.t)+'</div><div class="meta">'+(n.race?'Stopwatch met stem, jij bepaalt het einde':n.test?'10 min rustig inlopen, daarna een stopwatch. Plan een route van '+n.test+' km bij Routes.':
       'Totaal '+Math.round(sum(segs)/60)+' min, inclusief warming-up en cooling-down')+'</div>'+
       '<div class="strip">'+stripHTML(segs)+'</div><div class="legend">'+kinds.map(k=>'<span style="--c:'+KIND[k].c+'">'+KIND[k].n+'</span>').join('')+'</div>'+
       '<button class="btn" onclick="startRun(\''+n.id+'\')">Start training</button></div>';
@@ -609,7 +612,7 @@ function intro(seg){const d=say(seg.s);
     case 'tempo':return 'Wedstrijdtempo. '+d+'. Iets vlotter, maar onder controle.';
     case 'sprint':return 'Versnellen. '+d+'.';
     case 'cool':return 'Cooling-down. Wandel '+d+' uit. Goed gedaan.';
-    case 'open':return 'Succes Teun. Begin rustig, de eerste kilometers horen makkelijk te voelen.';
+    case 'open':if(seg.txt)return seg.txt;return 'Succes Teun. Begin rustig, de eerste kilometers horen makkelijk te voelen.';
   }return '';}
 function tick(){
   if(!A)return;const e=elapsed(),p=locate(e);
@@ -621,7 +624,7 @@ function tick(){
   $('#r-kind').textContent=paused?'Pauze':k.n;$('#r-kind').style.color=k.c;
   $('#r-time').textContent=open?mmss(p.into):mmss(Math.ceil(p.rem));
   $('#r-el').textContent=mmss(active());
-  if(open){$('#r-rest').textContent='Tik op stop bij de finish';$('#r-tot').style.strokeDashoffset=CIRCT;$('#r-mark').style.left='0%';$('#r-next').innerHTML='Doel: uitlopen. Tempo rond <b>7:00 per km</b>';}
+  if(open){$('#r-rest').textContent='Tik op stop bij de finish';$('#r-tot').style.strokeDashoffset=CIRCT;$('#r-mark').style.left='0%';$('#r-next').innerHTML=RUN.test?'Testloop: <b>'+RUN.test+' km</b> zo snel als je volhoudt':'Doel: uitlopen. Tempo rond <b>7:00 per km</b>';}
   else{$('#r-rest').textContent='nog '+mmss(TOTAL-e)+' totaal';$('#r-tot').style.strokeDashoffset=CIRCT*(1-e/TOTAL);
     $('#r-mark').style.left=(e/TOTAL*100)+'%';const nx=SEGS[p.i+1];
     $('#r-next').innerHTML=nx?'Hierna: <b>'+KIND[nx.k].n+'</b> '+mmss(nx.s):'Laatste blok';}
@@ -629,7 +632,7 @@ function tick(){
   renderGps(p);
   if(paused)return;
   // meldingen
-  if(p.i!==lastIdx){lastIdx=p.i;A.bm=A.m||0;A.bt=active();if(p.into<8){speak(intro(p.seg),true);beep(1175,.35);}}
+  if(p.i!==lastIdx){lastIdx=p.i;if(RUN.test&&p.seg.k==='open'&&p.into<8){A.m=0;trk=[];}A.bm=A.m||0;A.bt=active();if(p.into<8){speak(intro(p.seg),true);beep(1175,.35);}}
   if(open){const m=Math.floor(p.into/300);if(m>0&&!said.has('o'+m)&&p.into-m*300<5){said.add('o'+m);if(S.settings.cues)speak(say(m*300)+' gelopen.');}return;}
   const key=p.i+':';
   if(S.settings.cues){
@@ -656,17 +659,18 @@ function segBack(){if(!A)return;const p=locate(elapsed());if(!p)return;
 function stopEngine(){clearInterval(timer);timer=null;wakeOff();gpsStop();A=null;S.active=null;save();$('#runv').classList.remove('on');}
 function mainDone(){ // seconden in het hoofddeel
   const e=elapsed();if(RUN.race)return Math.round(active());
+  if(RUN.test){const p=locate(e);return Math.round(p&&p.seg.k==='open'?p.into:0);}
   const warm=SEGS[0].k==='warm'?SEGS[0].s:0;return Math.round(Math.max(0,Math.min(sum(RUN.main),e-warm)));}
 function gpsKm(){return A&&A.m>50?Math.round(A.m/10)/100:0;}
 function complete(){const id=RUN.id,secs=sum(RUN.main),km=gpsKm();speak('Training klaar. Goed gedaan.',true);beep(1319,.5);
   stopEngine();renderAll();logSheet(id,secs,true,km);}
 function askStop(){if(!A)return;const was=A.pausedAt;if(!was){A.pausedAt=Date.now();setPP();tick();}
-  sheet('<h2>'+(RUN.race?'Gefinisht?':'Training stoppen?')+'</h2><p class="sub">'+mmss(active())+' bezig.</p>'+
-   '<button class="btn" onclick="finishNow()">'+(RUN.race?'Finish: opslaan':'Opslaan als gedaan')+'</button>'+
+  sheet('<h2>'+(RUN.race||RUN.test?'Gefinisht?':'Training stoppen?')+'</h2><p class="sub">'+mmss(active())+' bezig.</p>'+
+   '<button class="btn" onclick="finishNow()">'+(RUN.race||RUN.test?'Finish: opslaan':'Opslaan als gedaan')+'</button>'+
    '<button class="btn ghost small" onclick="resumeFromStop()">Doorgaan</button>'+
    '<button class="btn danger small" onclick="closeSheet();stopEngine();renderAll()">Stoppen zonder opslaan</button>',true);}
 function resumeFromStop(){closeSheet();if(A&&A.pausedAt){A.paused+=Date.now()-A.pausedAt;A.pausedAt=null;save();setPP();tick();}}
-function finishNow(){const id=RUN.id,secs=mainDone(),km=gpsKm();if(RUN.race)speak('Gefinisht. Gefeliciteerd.',true);stopEngine();renderAll();logSheet(id,secs,true,km);}
+function finishNow(){const id=RUN.id,secs=mainDone(),km=RUN.test||gpsKm();if(RUN.race)speak('Gefinisht. Gefeliciteerd.',true);stopEngine();renderAll();logSheet(id,secs,true,km);}
 
 
 /* ---------- account en synchronisatie via een GitHub-gist ---------- */

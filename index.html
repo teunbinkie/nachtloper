@@ -114,7 +114,14 @@ nav button.on{color:var(--lime)}
 #runv .rtop div{font-size:13px;color:var(--mute);font-weight:700;letter-spacing:.04em}
 #runv .rtop b{color:var(--text)}
 .ringwrap{flex:1;display:flex;align-items:center;justify-content:center;position:relative;min-height:0}
-.ringwrap svg{width:min(88vw,52vh);height:min(88vw,52vh)}
+.ringwrap svg{width:min(84vw,44vh);height:min(84vw,44vh)}
+.stats{display:flex;justify-content:space-around;margin:10px 0 2px}
+.stat{text-align:center;min-width:30%}.stat b{display:block;font-size:30px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat span{font-size:11px;color:var(--mute);letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+.stat b.fast{color:var(--orange)}.stat b.good{color:var(--lime)}
+.gpsmsg{text-align:center;font-size:12px;color:var(--mute);min-height:16px}
+.shift{display:flex;gap:10px}.shift .btn{margin-top:10px}
+.warn{color:var(--orange);font-size:13px;line-height:1.4;margin-top:8px}
 .ringwrap circle{fill:none}
 .c-track{stroke:var(--surface2);stroke-width:16}
 .c-ring{stroke-width:16;stroke-linecap:round;transition:stroke-dashoffset .25s linear,stroke .3s}
@@ -122,7 +129,7 @@ nav button.on{color:var(--lime)}
 .c-tot{stroke:var(--text);stroke-width:3;stroke-linecap:round;opacity:.7}
 .center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none}
 .center .kind{font-size:17px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
-.center .time{font-size:min(21vw,12vh);font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.05}
+.center .time{font-size:min(19vw,10.5vh);font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.05}
 .center .rest{font-size:14px;color:var(--mute);font-variant-numeric:tabular-nums}
 #runv.paused .time{opacity:.45}
 .nextup{text-align:center;font-size:15px;color:var(--mute);min-height:22px}
@@ -189,6 +196,7 @@ nav button.on{color:var(--lime)}
       <div class="rest" id="r-rest"></div>
     </div>
   </div>
+  <div class="stats" id="r-stats"><div class="stat"><b id="r-pace">--:--</b><span>tempo /km</span></div><div class="stat"><b id="r-dist">0,00</b><span>km</span></div><div class="stat"><b id="r-avg">--:--</b><span>gem. dit blok</span></div></div><div class="gpsmsg" id="r-gps"></div>
   <div class="nextup" id="r-next"></div>
   <div class="prog"><div class="strip" id="r-strip"></div><div class="mark" id="r-mark"></div></div>
   <div class="ctrl">
@@ -205,7 +213,7 @@ nav button.on{color:var(--lime)}
 
 <script>
 'use strict';
-const APP_VERSION='4';
+const APP_VERSION='5';
 /* ---------- schema ---------- */
 const R=m=>({k:'run',s:Math.round(m*60)}), W=m=>({k:'walk',s:Math.round(m*60)}),
       T=m=>({k:'tempo',s:Math.round(m*60)}), SP=s=>({k:'sprint',s:s});
@@ -262,7 +270,7 @@ const TIPS=[
 /* ---------- opslag ---------- */
 const KEY='nachtloper.v1';
 const DEF={name:'Teun',tomb:{},setUpd:0,sync:null,done:{'1-1':{date:'2026-11-16',secs:622,km:1.75,feel:0,note:'Nachtloop',upd:1},'1-2':{date:'2026-11-17',secs:945,km:2.43,feel:0,note:'Ct5 6',upd:1}},
-  settings:{voice:true,voiceName:'',rate:1,beeps:true,cues:true,warm:5,cool:5,start:'2026-11-16',race:'2027-02-06'},active:null};
+  settings:{voice:true,voiceName:'',rate:1,beeps:true,cues:true,warm:5,cool:5,gps:true,start:'2026-11-16',race:'2027-02-06'},active:null};
 let S;try{S=JSON.parse(localStorage.getItem(KEY));}catch(e){}
 if(!S||!S.settings){S=JSON.parse(JSON.stringify(DEF));}
 S.settings=Object.assign({},DEF.settings,S.settings);S.done=S.done||{};S.tomb=S.tomb||{};S.setUpd=S.setUpd||0;S.name=S.name||'Teun';if(S.sync===undefined)S.sync=null;
@@ -329,10 +337,20 @@ function renderHome(){
   $('#v-home').innerHTML=h;
 }
 
+function shiftWeeks(n){const d=pd(S.settings.start);d.setDate(d.getDate()+7*n);setS('start',iso(d));renderAll();}
+function planWarning(){const end=weekStart(12);end.setDate(end.getDate()+5);const race=pd(S.settings.race);
+  const diff=Math.round((end-race)/864e5/7);
+  if(diff>0)return 'Week 12 valt nu '+diff+(diff===1?' week':' weken')+' na de wedstrijd. Sla dan herstelweek 8 over, of loop 2 runs uit een week en ga door.';
+  if(diff<0)return 'Week 12 valt '+(-diff)+(diff===-1?' week':' weken')+' voor de wedstrijd. Herhaal gerust een week.';
+  return '';}
 function renderPlan(){
   const cw=curWeek();
   let h='<div class="top"><div><div class="brand">12 weken</div><h1>Schema</h1></div><div class="chip"><b>'+
     Object.keys(S.done).filter(k=>byId(k)).length+'</b> / 36 gedaan</div></div>';
+  const wn=planWarning();
+  h+='<div class="card"><h3>Schema schuiven</h3><p class="sub">Ziek of een drukke week? Schuif alle weken op. Je logboek blijft staan.</p>'+
+    (wn?'<p class="warn">'+esc(wn)+'</p>':'')+
+    '<div class="shift"><button class="btn ghost small" onclick="shiftWeeks(-1)">1 week eerder</button><button class="btn small" onclick="shiftWeeks(1)">1 week later</button></div></div>';
   PLAN.forEach((w,i)=>{const ws=weekStart(i+1);
     h+='<div class="week'+(i+1===cw?' cur':'')+'"><div class="wkhead"><b>Week '+(i+1)+'</b><span>vanaf ma '+fd(ws)+'</span></div>'+
       (w.note?'<div class="wknote">'+esc(w.note)+'</div>':'');
@@ -384,6 +402,7 @@ function renderSet(){
    '<button class="btn ghost small" onclick="unlockAudio();speak(\'Rennen. 4 minuten. Rustig tempo.\',true);beep(880,.15)">Test stem en piep</button></div>'+
    '<div class="card"><h3>Training</h3>'+
    '<div class="row"><label>Warming-up<small>Minuten wandelen vooraf</small></label><input type="number" min="0" max="15" value="'+st.warm+'" onchange="setS(\'warm\',Math.max(0,+this.value||0));renderAll()"></div>'+
+   '<div class="row"><label>Tempo via GPS<small>Live tempo en afstand tijdens de run</small></label>'+sw('gps')+'</div>'+
    '<div class="row"><label>Cooling-down<small>Minuten wandelen na afloop</small></label><input type="number" min="0" max="15" value="'+st.cool+'" onchange="setS(\'cool\',Math.max(0,+this.value||0));renderAll()"></div>'+
    '<div class="row"><label>Start schema<small>Maandag van week 1</small></label><input type="date" value="'+st.start+'" onchange="if(this.value){setS(\'start\',this.value);renderAll()}"></div>'+
    '<div class="row"><label>Wedstrijddatum</label><input type="date" value="'+st.race+'" onchange="if(this.value){setS(\'race\',this.value);renderAll()}"></div></div>'+
@@ -411,11 +430,11 @@ function openRun(id){
 }
 
 let logFeel=0;
-function logSheet(id,secs,fresh){
+function logSheet(id,secs,fresh,gkm){
   const r=byId(id),d=S.done[id]||{};logFeel=d.feel||0;
   const t=d.secs||secs||(r.race?0:sum(r.main));
   sheet('<h2>'+(fresh?'Training klaar':'Run loggen')+'</h2><p class="sub">'+esc(r.t)+'</p>'+
-   '<div class="two"><div class="field"><label>Afstand (km)</label><input id="l-km" inputmode="decimal" placeholder="uit Strava" value="'+(d.km?String(d.km).replace('.',','):'')+'"></div>'+
+   '<div class="two"><div class="field"><label>Afstand (km)</label><input id="l-km" inputmode="decimal" placeholder="uit Strava" value="'+(d.km?String(d.km).replace('.',','):(gkm?String(gkm).replace('.',','):''))+'"></div>'+
    '<div class="field"><label>Tijd (min:sec)</label><input id="l-t" inputmode="numbers-and-punctuation" value="'+(t?mmss(t):'')+'"></div></div>'+
    '<div class="field"><label>Hoe voelde het?</label><div class="feel" id="l-feel">'+[1,2,3,4,5].map(n=>
      '<button class="'+(n===logFeel?'on':'')+'" onclick="setFeel('+n+')">'+n+'</button>').join('')+'</div>'+
@@ -458,6 +477,49 @@ function speak(txt,force){if(!force&&!S.settings.voice)return;if(!('speechSynthe
     if(force)speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
 if('speechSynthesis' in window)speechSynthesis.onvoiceschanged=()=>{if($('#v-set').classList.contains('on'))renderSet();};
 
+
+/* ---------- gps-tempo (alleen tonen, de stem zegt het niet) ---------- */
+let geoW=null,trk=[];
+const TARGET={run:[420,450],tempo:[405,420],open:[400,440]};
+function hav(a,b){const R=6371000,r=x=>x*Math.PI/180,dLa=r(b.lat-a.lat),dLo=r(b.lon-a.lon);
+  const s=Math.sin(dLa/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLo/2)**2;return 2*R*Math.asin(Math.sqrt(s));}
+function gpsMsg(m){$('#r-gps').textContent=m;}
+function gpsStart(){
+  trk=[];$('#r-stats').style.display=S.settings.gps?'':'none';gpsMsg('');
+  if(!S.settings.gps)return;
+  if(!('geolocation' in navigator)){gpsMsg('GPS niet beschikbaar in deze browser');return;}
+  if(geoW!==null)return;
+  if(!A.m)gpsMsg('GPS zoeken');
+  geoW=navigator.geolocation.watchPosition(onPos,err=>{gpsMsg(err.code===1?'Geen toestemming voor locatie. Zet die aan bij Instellingen > Privacy > Locatievoorzieningen > Safari-websites.':'Geen GPS-signaal');},
+    {enableHighAccuracy:true,maximumAge:0,timeout:20000});
+}
+function gpsStop(){if(geoW!==null){try{navigator.geolocation.clearWatch(geoW);}catch(e){}}geoW=null;trk=[];}
+function onPos(pos){
+  if(!A)return;const c=pos.coords,pt={lat:c.latitude,lon:c.longitude,t:pos.timestamp||Date.now()};
+  if(c.accuracy>30){gpsMsg('Zwak GPS-signaal ('+Math.round(c.accuracy)+' m)');return;}
+  gpsMsg('');
+  if(A.pausedAt){A.gl=null;return;}
+  const last=A.gl;if(!last){A.gl=pt;return;}
+  const d=hav(last,pt),dt=(pt.t-last.t)/1000;if(dt<=0)return;
+  if(d<Math.max(3,c.accuracy*0.3))return;      // stilstaan of ruis
+  if(d/dt>7){A.gl=pt;return;}                   // onmogelijke sprong
+  A.m=(A.m||0)+d;A.gl=pt;trk.push({t:pt.t,m:A.m});
+  while(trk.length>2&&pt.t-trk[0].t>40000)trk.shift();
+  if(!A.gs||pt.t-A.gs>10000){A.gs=pt.t;saveLocal();}
+}
+function curPace(){
+  if(trk.length<2)return 0;const last=trk[trk.length-1];if(Date.now()-last.t>12000)return 0;
+  let first=trk[0];for(const x of trk){if(last.t-x.t<=30000){first=x;break;}}
+  const dm=last.m-first.m,dt=(last.t-first.t)/1000;if(dm<20||dt<5)return 0;return dt/(dm/1000);
+}
+function renderGps(p){
+  if(!S.settings.gps)return;
+  const m=A.m||0;$('#r-dist').textContent=(m/1000).toFixed(2).replace('.',',');
+  const cp=A.pausedAt?0:curPace(),el=$('#r-pace');el.textContent=cp&&cp<1200?mmss(cp):'--:--';
+  const tg=TARGET[p.seg.k];el.className=!cp||!tg?'':cp<tg[0]-5?'fast':cp<=tg[1]+15?'good':'';
+  const bm=m-(A.bm||0),bt=active()-(A.bt||0);$('#r-avg').textContent=bm>50?mmss(bt/(bm/1000)):'--:--';
+}
+
 /* ---------- timer ---------- */
 let A=null,SEGS=[],RUN=null,TOTAL=0,timer=null,lastIdx=-1,said=new Set(),wake=null;
 const CIRC=2*Math.PI*126,CIRCT=2*Math.PI*145;
@@ -474,7 +536,7 @@ function startRun(id,resume){
   said=new Set();lastIdx=-1;
   $('#r-title').innerHTML='WEEK '+RUN.w+' · RUN '+RUN.n;
   $('#r-strip').innerHTML=stripHTML(SEGS);
-  $('#runv').classList.add('on');setPP();setVI();wakeOn();
+  $('#runv').classList.add('on');setPP();setVI();wakeOn();gpsStart();
   clearInterval(timer);timer=setInterval(tick,200);tick();
 }
 function elapsed(){return ((A.pausedAt||Date.now())-A.start-A.paused)/1000+A.skip;}
@@ -507,9 +569,10 @@ function tick(){
     $('#r-mark').style.left=(e/TOTAL*100)+'%';const nx=SEGS[p.i+1];
     $('#r-next').innerHTML=nx?'Hierna: <b>'+KIND[nx.k].n+'</b> '+mmss(nx.s):'Laatste blok';}
   $('#runv').classList.toggle('paused',paused);
+  renderGps(p);
   if(paused)return;
   // meldingen
-  if(p.i!==lastIdx){lastIdx=p.i;if(p.into<8){speak(intro(p.seg),true);beep(1175,.35);}}
+  if(p.i!==lastIdx){lastIdx=p.i;A.bm=A.m||0;A.bt=active();if(p.into<8){speak(intro(p.seg),true);beep(1175,.35);}}
   if(open){const m=Math.floor(p.into/300);if(m>0&&!said.has('o'+m)&&p.into-m*300<5){said.add('o'+m);if(S.settings.cues)speak(say(m*300)+' gelopen.');}return;}
   const key=p.i+':';
   if(S.settings.cues){
@@ -526,26 +589,27 @@ function setVI(){$('#r-vi').innerHTML=S.settings.voice?'<path d="M4 9v6h4l5 4V5L
 function toggleVoice(){setS('voice',!S.settings.voice);setVI();if(S.settings.voice)speak('Stem aan.',true);else try{speechSynthesis.cancel();}catch(e){}}
 function togglePause(){if(!A)return;unlockAudio();
   if(A.pausedAt){A.paused+=Date.now()-A.pausedAt;A.pausedAt=null;speak('Verder.',true);}
-  else{A.pausedAt=Date.now();speak('Pauze.',true);}
+  else{A.pausedAt=Date.now();A.gl=null;speak('Pauze.',true);}
   save();setPP();tick();}
 function clearSaid(i){[...said].forEach(k=>{if(k.indexOf(i+':')===0)said.delete(k);});}
 function segSkip(){if(!A)return;const p=locate(elapsed());if(!p||p.seg.k==='open')return;A.skip+=p.rem+.01;save();tick();}
 function segBack(){if(!A)return;const p=locate(elapsed());if(!p)return;
   if(p.into<4&&p.i>0){A.skip-=p.into+SEGS[p.i-1].s;clearSaid(p.i-1);}else{A.skip-=p.into;}
   clearSaid(p.i);lastIdx=-1;save();tick();}
-function stopEngine(){clearInterval(timer);timer=null;wakeOff();A=null;S.active=null;save();$('#runv').classList.remove('on');}
+function stopEngine(){clearInterval(timer);timer=null;wakeOff();gpsStop();A=null;S.active=null;save();$('#runv').classList.remove('on');}
 function mainDone(){ // seconden in het hoofddeel
   const e=elapsed();if(RUN.race)return Math.round(active());
   const warm=SEGS[0].k==='warm'?SEGS[0].s:0;return Math.round(Math.max(0,Math.min(sum(RUN.main),e-warm)));}
-function complete(){const id=RUN.id,secs=sum(RUN.main);speak('Training klaar. Goed gedaan.',true);beep(1319,.5);
-  stopEngine();renderAll();logSheet(id,secs,true);}
+function gpsKm(){return A&&A.m>50?Math.round(A.m/10)/100:0;}
+function complete(){const id=RUN.id,secs=sum(RUN.main),km=gpsKm();speak('Training klaar. Goed gedaan.',true);beep(1319,.5);
+  stopEngine();renderAll();logSheet(id,secs,true,km);}
 function askStop(){if(!A)return;const was=A.pausedAt;if(!was){A.pausedAt=Date.now();setPP();tick();}
   sheet('<h2>'+(RUN.race?'Gefinisht?':'Training stoppen?')+'</h2><p class="sub">'+mmss(active())+' bezig.</p>'+
    '<button class="btn" onclick="finishNow()">'+(RUN.race?'Finish: opslaan':'Opslaan als gedaan')+'</button>'+
    '<button class="btn ghost small" onclick="resumeFromStop()">Doorgaan</button>'+
    '<button class="btn danger small" onclick="closeSheet();stopEngine();renderAll()">Stoppen zonder opslaan</button>',true);}
 function resumeFromStop(){closeSheet();if(A&&A.pausedAt){A.paused+=Date.now()-A.pausedAt;A.pausedAt=null;save();setPP();tick();}}
-function finishNow(){const id=RUN.id,secs=mainDone();if(RUN.race)speak('Gefinisht. Gefeliciteerd.',true);stopEngine();renderAll();logSheet(id,secs,true);}
+function finishNow(){const id=RUN.id,secs=mainDone(),km=gpsKm();if(RUN.race)speak('Gefinisht. Gefeliciteerd.',true);stopEngine();renderAll();logSheet(id,secs,true,km);}
 
 
 /* ---------- account en synchronisatie via een GitHub-gist ---------- */
